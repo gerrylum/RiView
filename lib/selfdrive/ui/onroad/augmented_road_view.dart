@@ -146,7 +146,7 @@ class _AugmentedRoadViewState extends State<AugmentedRoadView> {
                           ),
                         ),
                         Text(
-                          'OPRivView $opviewBuild',
+                          'RiView $opviewBuild',
                           style: TextStyle(color: const Color(0x66FFFFFF), fontSize: 18 * scale),
                         ),
                         SizedBox(height: 20 * scale),

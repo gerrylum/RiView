@@ -7,7 +7,7 @@ import android.content.Intent
 import android.os.Bundle
 
 /**
- * Share › OPRivView from Google Maps (or anything sharing text): hands the shared text to the
+ * Share › RiView from Google Maps (or anything sharing text): hands the shared text to the
  * running app and brings it to the front, or starts the app with it waiting.
  *
  * A separate, invisible activity because Android starts a share's target inside the sharing app's

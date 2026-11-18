@@ -1,4 +1,4 @@
-// A place shared from Google Maps on the head unit (Share › OPRivView), or a Maps link pasted into
+// A place shared from Google Maps on the head unit (Share › RiView), or a Maps link pasted into
 // Navigate's search (Gerry 2026-11-06). The comma only needs the latitude and longitude, which
 // Google's links may carry: Maps shares the place's name (and sometimes its address) and a short
 // maps.app.goo.gl link, which redirects to a google.com/maps link. When that link holds the pin's
@@ -176,7 +176,7 @@ class SharedResolution {
 /// a name lookup ignores places farther than this from the truck
 const sharedMatchRadiusMetres = 300000.0;
 
-/// for following Google's redirects, as a desktop browser; MapTiler requests keep OPRivView's own
+/// for following Google's redirects, as a desktop browser; MapTiler requests keep RiView's own
 const googleHeaders = {
   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
   'Accept-Language': 'en',

@@ -106,7 +106,7 @@ class MenuRail extends StatelessWidget {
           ClipRRect(
             borderRadius: BorderRadius.circular(26 * unit),
             child: Image.asset(
-              'assets/icons/oprivview_logo.png',
+              'assets/icons/riview_logo.png',
               key: const ValueKey('menuLogo'),
               width: (menuRailWidth - 30) * unit,
               height: (menuRailWidth - 30) * unit,

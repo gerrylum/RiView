@@ -238,7 +238,7 @@ class _SettingsPageState extends State<SettingsPage> {
         if (widget.build != null)
           Padding(
             padding: EdgeInsets.symmetric(horizontal: 12 * u),
-            child: Text('OPRivView · ${widget.build}', style: TextStyle(color: const Color(0xFF6E6E6E), fontSize: 17 * u)),
+            child: Text('RiView · ${widget.build}', style: TextStyle(color: const Color(0xFF6E6E6E), fontSize: 17 * u)),
           ),
       ]),
     );
@@ -303,7 +303,7 @@ class _SettingsPageState extends State<SettingsPage> {
   // -- Display --
 
   Widget _display() => _columns([
-        _cardBox('BRIGHTNESS', [_brightness()], sub: 'Auto follows the head unit. Set here, it applies while OPRivView is open'),
+        _cardBox('BRIGHTNESS', [_brightness()], sub: 'Auto follows the head unit. Set here, it applies while RiView is open'),
         _cardBox('CLOCK', [
           _choices<ClockMode>('clock', const [ClockMode.h12, ClockMode.h24], s.clockMode == ClockMode.h24 ? ClockMode.h24 : ClockMode.h12,
               (m) => m == ClockMode.h24 ? '24 h' : '12 h', s.setClockMode),
@@ -748,8 +748,8 @@ class _SettingsPageState extends State<SettingsPage> {
         _cardBox('UPDATE', [_updateCard()]),
         _cardBox('ABOUT', [
           _valueRow('Version', widget.updater.installed),
-          _valueRow('Source', 'gerrylum/opview'),
-          _row('Licences', _button('View', () => showLicensePage(context: context, applicationName: 'OPRivView'), key: 'licences')),
+          _valueRow('Source', 'gerrylum/riview'),
+          _row('Licences', _button('View', () => showLicensePage(context: context, applicationName: 'RiView'), key: 'licences')),
           _valueRow('Map data', '© MapTiler © OpenStreetMap'),
         ]),
       ]);

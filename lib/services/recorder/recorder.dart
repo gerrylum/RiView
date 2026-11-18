@@ -151,7 +151,7 @@ class Recorder extends ChangeNotifier {
 
   void _applyPause() {
     if (state == RecordState.off) return;
-    final reason = !_foreground ? 'OPRivView is in the background' : (_coveredBy == null ? '' : '$_coveredBy open on the head unit');
+    final reason = !_foreground ? 'RiView is in the background' : (_coveredBy == null ? '' : '$_coveredBy open on the head unit');
     platform.setPaused(!_foreground || _coveredBy != null, reason: reason);
   }
 

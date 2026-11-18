@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# OPRivView's icon as a vector, redrawn from Gerry's Midjourney pick (2026-11-05): a road to the
+# RiView's icon as a vector, redrawn from Gerry's Midjourney pick (2026-11-05): a road to the
 # horizon seen through a gauge ring, green arc and green centre line. 1024 viewBox.
 # Run it, then scripts/generate_icons.py, to remake every app icon (needs Playwright's Chromium)
 import math
@@ -71,7 +71,7 @@ def svg(background=True, wordmark=False, size=1024, shift=None, radius=230):
     bg = (f'<rect width="1024" height="1024" rx="{radius}" fill="url(#bg)"/>'
           f'<rect width="1024" height="1024" rx="{radius}" fill="url(#glow)"/>') if background else ''
     word = ('<text x="512" y="935" text-anchor="middle" font-family="Roboto, Arial" font-weight="800" '
-            'font-size="88" letter-spacing="4" fill="#F2F2F2">OPRIVVIEW</text>') if wordmark else ''
+            'font-size="88" letter-spacing="4" fill="#F2F2F2">RIVIEW</text>') if wordmark else ''
     # the ring opens at the bottom where the road comes through
     return f'''<svg xmlns="http://www.w3.org/2000/svg" width="{size}" height="{size}" viewBox="0 0 1024 1024">
 <defs>
@@ -147,7 +147,7 @@ if __name__ == '__main__':
     render(full, a('logo.png'), 1024)
     # the menu's logo: closer in, the ring filling most of the tile so it reads at 120 px
     from PIL import Image
-    big = a('icons', 'oprivview_logo.png')
+    big = a('icons', 'riview_logo.png')
     render(full, big, 1024)
     side = 2 * (GREY_R + GREY_W / 2) / 0.86
     cy = CY + 52

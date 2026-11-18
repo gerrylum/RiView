@@ -1,4 +1,4 @@
-// in-app updates: compare this build with the latest GitHub release of gerrylum/opview,
+// in-app updates: compare this build with the latest GitHub release of gerrylum/riview,
 // download its APK, and hand it to Android's installer (which always asks to confirm).
 // Updates install over the app only when both are signed with the same release key
 
@@ -15,7 +15,7 @@ import 'package:opview/services/system_service.dart' as system;
 /// time with --dart-define=OPVIEW_BUILD; branch builds are `<branch>-<sha>`
 const installedVersion = String.fromEnvironment('OPVIEW_BUILD', defaultValue: 'dev build');
 
-const _latestReleaseUrl = 'https://api.github.com/repos/gerrylum/opview/releases/latest';
+const _latestReleaseUrl = 'https://api.github.com/repos/gerrylum/riview/releases/latest';
 
 class ReleaseInfo {
   final String version;  // tag without the leading v
@@ -129,7 +129,7 @@ class Updater extends ChangeNotifier {
       // Android: the cache folder shared with the installer; tests and other platforms: temp
       final dir = Directory(await system.updateDir() ?? '${Directory.systemTemp.path}/updates');
       await dir.create(recursive: true);
-      final file = File('${dir.path}/OPRivView-update.apk');
+      final file = File('${dir.path}/RiView-update.apk');
       final response = await client.send(http.Request('GET', Uri.parse(release.apkUrl)));
       if (response.statusCode != 200) {
         _set(UpdateStatus.failed, 'Download failed (${response.statusCode})');
@@ -161,7 +161,7 @@ class Updater extends ChangeNotifier {
       if (!await system.canInstallApks()) {
         // Android asks once to allow installs from this app; after that, Update again
         await system.openInstallSettings();
-        _set(UpdateStatus.available, 'Allow "Install unknown apps" for OPRivView, then Update again');
+        _set(UpdateStatus.available, 'Allow "Install unknown apps" for RiView, then Update again');
         return;
       }
       await system.installApk(file.path);

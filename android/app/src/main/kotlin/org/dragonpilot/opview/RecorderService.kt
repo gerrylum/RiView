@@ -83,7 +83,7 @@ class RecorderService : Service() {
             CaptureHub.capture = capture
             CaptureHub.onStarted?.invoke(true)
         } catch (e: Exception) {
-            Log.e("OPRivRecord", "start", e)
+            Log.e("RiViewRecord", "start", e)
             CaptureHub.onStarted?.invoke(false)
             stopSelf()
         }
@@ -96,7 +96,7 @@ class RecorderService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             nm.createNotificationChannel(
                 NotificationChannel(CHANNEL_ID, "Recording", NotificationManager.IMPORTANCE_LOW).apply {
-                    description = "While OPRivView keeps the last minute or records a clip"
+                    description = "While RiView keeps the last minute or records a clip"
                 },
             )
         }
@@ -107,7 +107,7 @@ class RecorderService : Service() {
             Notification.Builder(this)
         }
         val notification = builder
-            .setContentTitle("OPRivView")
+            .setContentTitle("RiView")
             .setContentText("Keeping the last minute for Record")
             .setSmallIcon(android.R.drawable.presence_video_online)
             .setOngoing(true)

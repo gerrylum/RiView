@@ -193,7 +193,7 @@ class NavMapState extends State<NavMap> {
             if (widget.tiles)
               TileLayer(
                 urlTemplate: mapTileUrl(widget.mapKey!, light: widget.light),
-                userAgentPackageName: 'OPRivView',
+                userAgentPackageName: 'RiView',
                 tileProvider: _tileProvider,
                 maxZoom: 19,
               ),

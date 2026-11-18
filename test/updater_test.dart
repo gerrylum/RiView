@@ -13,10 +13,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 Map<String, dynamic> _release(String tag, {bool apk = true}) => {
       'tag_name': tag,
-      'body': "## What's Changed\n\n- Swipe sideways to change the layout\n- Smaller road name\n\n## Download\n\n- **OPRivView APK**",
+      'body': "## What's Changed\n\n- Swipe sideways to change the layout\n- Smaller road name\n\n## Download\n\n- **RiView APK**",
       'assets': [
         if (apk)
-          {'name': 'OPRivView-${tag.substring(1)}.apk', 'browser_download_url': 'https://example.invalid/a.apk', 'size': 19000000},
+          {'name': 'RiView-${tag.substring(1)}.apk', 'browser_download_url': 'https://example.invalid/a.apk', 'size': 19000000},
       ],
     };
 

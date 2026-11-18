@@ -421,7 +421,7 @@ void main() {
       await tester.pumpWidget(_shell(_withDevice(), AppSettings(), onExit: () => exits++));
       await tester.tap(find.byKey(const ValueKey('menu_exit')));
       await tester.pumpAndSettle();
-      expect(find.text('Exit OPRivView?'), findsOneWidget);
+      expect(find.text('Exit RiView?'), findsOneWidget);
       await tester.tap(find.byKey(const ValueKey('exitCancel')));
       await tester.pumpAndSettle();
       expect(exits, 0);

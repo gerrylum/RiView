@@ -7,7 +7,7 @@
 //   already routing: the current route's card with End route
 //   typing: while the keyboard is up the search goes wide across the top, results three across
 //           above the keyboard (Gerry 2026-11-05, mockup K1); the rest of the app keeps its size
-//   shared from Google Maps (Share › OPRivView, or a Maps link pasted into the search): the place
+//   shared from Google Maps (Share › RiView, or a Maps link pasted into the search): the place
 //           is picked as if from the results, so it goes to the comma at once (Gerry 2026-11-06)
 //   not connected: a picked place waits and goes to the comma once it connects
 //   no MapTiler key: a card saying how to get one, in place of the search (the driver's own key,
@@ -452,7 +452,7 @@ class _NavigateViewState extends State<NavigateView> {
             child: Text(step, style: TextStyle(color: Colors.white, fontSize: 23 * u)),
           ),
         SizedBox(height: 6 * u),
-        Text('Leave the key unrestricted, or allow the User-Agent "OPRivView". '
+        Text('Leave the key unrestricted, or allow the User-Agent "RiView". '
             'Routes the comma already has still show their turns while driving.',
             style: TextStyle(color: _grey, fontSize: 19 * u, height: 1.3)),
         if (widget.onAddKey != null) ...[

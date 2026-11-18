@@ -60,7 +60,7 @@ class AppShell extends StatefulWidget {
   /// Settings' updates; the app's own unless replaced (tests)
   final Updater? updater;
 
-  /// places shared from Google Maps (Share › OPRivView): each opens Navigate with it
+  /// places shared from Google Maps (Share › RiView): each opens Navigate with it
   final SharedPlaces? sharedPlaces;
 
   /// reads a share; replaceable in tests (Google's links and MapTiler otherwise)
@@ -396,7 +396,7 @@ class _AppShellState extends State<AppShell> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: const Color(0xFF16171A),
-        title: const Text('Exit OPRivView?'),
+        title: const Text('Exit RiView?'),
         content: const Text('The stream from the comma stops. openpilot keeps driving on the comma as usual.'),
         actions: [
           TextButton(
@@ -440,12 +440,12 @@ Future<bool> showRecordExplainer(BuildContext context, {required int bufferSecon
         Flexible(child: Text("Record what's on screen")),
       ]),
       content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('OPRivView records the camera view with everything drawn on it: path, speed, torque bar and '
+        const Text('RiView records the camera view with everything drawn on it: path, speed, torque bar and '
             'alerts, plus the status bar.'),
         const SizedBox(height: 12),
         Text('$keep Clips stop at 5 minutes.'),
         const SizedBox(height: 12),
-        const Text('Android asks once each time OPRivView starts, and shows its screen-recording icon while '
+        const Text('Android asks once each time RiView starts, and shows its screen-recording icon while '
             'recording is ready. Nothing leaves the head unit unless you share it.',
             style: TextStyle(color: Color(0xFF8C8C8C))),
       ]),

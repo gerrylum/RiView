@@ -25,7 +25,7 @@ class _OpviewAppState extends State<OpviewApp> with WidgetsBindingObserver {
   final AppSettings _settings = AppSettings();
   late final Recorder _recorder;
 
-  // Share › OPRivView from Google Maps
+  // Share › RiView from Google Maps
   final _shared = SharedPlaces();
 
   // the app went fully into the background (not just PiP or the notification shade)
@@ -104,7 +104,7 @@ class _OpviewAppState extends State<OpviewApp> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'OPRivView',
+      title: 'RiView',
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark(useMaterial3: true).copyWith(
         scaffoldBackgroundColor: Colors.black,

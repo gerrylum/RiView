@@ -37,7 +37,7 @@ class MainActivity: FlutterActivity() {
     private val REQUEST_CAPTURE = 4101
     private val main = Handler(Looper.getMainLooper())
 
-    // Share › OPRivView from Google Maps (ShareActivity, ShareHub)
+    // Share › RiView from Google Maps (ShareActivity, ShareHub)
     private val SHARE_CHANNEL = "org.dragonpilot.opview/share"
 
     // shrink to a picture-in-picture window on Home; Dart turns this on while connected

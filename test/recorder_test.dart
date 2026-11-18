@@ -252,7 +252,7 @@ void main() {
       r.setCoveredBy('Navigate');
       expect(platform.pauseReason, 'Navigate open on the head unit');
       r.setForeground(false);
-      expect(platform.pauseReason, 'OPRivView is in the background');
+      expect(platform.pauseReason, 'RiView is in the background');
       r.setForeground(true);
       r.setCoveredBy(null);
       expect(platform.paused, isFalse);

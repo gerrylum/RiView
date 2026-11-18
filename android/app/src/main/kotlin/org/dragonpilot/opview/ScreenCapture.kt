@@ -35,7 +35,7 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
 
-private const val TAG = "OPRivRecord"
+private const val TAG = "RiViewRecord"
 
 const val MAX_CLIP_US = 5L * 60 * 1_000_000      // clips stop at 5:00
 private const val SEGMENT_US = 10L * 1_000_000   // a new segment file at the first keyframe after 10 s
@@ -66,7 +66,7 @@ class ScreenCapture(
     private val clipDir: File,
     private val listener: CaptureListener,
 ) {
-    private val glThread = HandlerThread("OPRivRecordGL").apply { start() }
+    private val glThread = HandlerThread("RiViewRecordGL").apply { start() }
     private val gl = Handler(glThread.looper)
     private var drainThread: Thread? = null
     @Volatile private var running = false
@@ -249,11 +249,11 @@ class ScreenCapture(
             textureSurface = surface
 
             display = projection.createVirtualDisplay(
-                "OPRivViewRecord", displayW, displayH, densityDpi,
+                "RiViewRecord", displayW, displayH, densityDpi,
                 DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR, surface, null, null,
             )
 
-            drainThread = Thread({ drain(enc) }, "OPRivRecordDrain").apply { start() }
+            drainThread = Thread({ drain(enc) }, "RiViewRecordDrain").apply { start() }
             gl.postDelayed(keepAlive, KEEP_ALIVE_MS)
         } catch (e: Exception) {
             Log.e(TAG, "set up", e)
@@ -488,7 +488,7 @@ class ScreenCapture(
             } finally {
                 segments.release(clip.files)
             }
-        }, "OPRivRecordJoin").start()
+        }, "RiViewRecordJoin").start()
     }
 
     // -- GL helpers --

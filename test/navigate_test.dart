@@ -81,7 +81,8 @@ void main() {
       expect(parseGeocoding('[]'), isEmpty);
     });
 
-    test('requests say OPRivView, which the key is restricted to', () {
+    test('requests say RiView, which a key may be restricted to (and OPRivView, the old name)', () {
+      expect(mapTilerUserAgent, contains('RiView'));
       expect(mapTilerUserAgent, contains('OPRivView'));
     });
 
@@ -100,7 +101,7 @@ void main() {
           });
       expect(await checkMapTilerKey(answering(200), '  abcDEF1234567890 '), isNull);
       expect(asked!.queryParameters['key'], 'abcDEF1234567890');
-      expect(headers!['User-Agent'], contains('OPRivView'));
+      expect(headers!['User-Agent'], contains('RiView'));
       expect(await checkMapTilerKey(answering(403), 'abcDEF1234567890'), contains('refused the key (403)'));
       expect(await checkMapTilerKey(answering(429), 'abcDEF1234567890'), contains('free limit'));
       expect(await checkMapTilerKey(answering(200), ''), 'Enter a key');

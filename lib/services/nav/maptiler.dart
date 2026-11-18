@@ -2,7 +2,7 @@
 //
 // Each driver brings their own free key (Gerry 2026-11-05: no key in the builds), entered in
 // Settings > Navigation and kept in AppSettings.mapTilerKey. A key can be left unrestricted or be
-// restricted on MapTiler to a User-Agent containing "OPRivView", which every request here sends.
+// restricted on MapTiler to a User-Agent containing "RiView", which every request here sends.
 // Requests go straight from the head unit to MapTiler (their terms allow no proxy).
 
 import 'dart:convert';
@@ -10,8 +10,9 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:opview/services/nav/places.dart';
 
-/// a key restricted to OPRivView needs "OPRivView" in the User-Agent
-const mapTilerUserAgent = 'OPRivView/0.1 (Android head unit)';
+/// a key restricted to the app needs its name in the User-Agent: "RiView", or "OPRivView" for a
+/// key restricted before the rename (2026-11-18), which this still carries
+const mapTilerUserAgent = 'RiView/0.2 (OPRivView; Android head unit)';
 const mapTilerHeaders = {'User-Agent': mapTilerUserAgent};
 
 /// the street map's 256 px raster tiles (one API request each), dark or [light]
@@ -23,7 +24,7 @@ const mapAttribution = '© MapTiler © OpenStreetMap contributors';
 
 /// where to get a key, for Settings and Navigate
 const mapTilerKeyHelp = 'Free at maptiler.com: sign up, then Account › API keys. '
-    'Leave the key unrestricted, or allow the User-Agent "OPRivView".';
+    'Leave the key unrestricted, or allow the User-Agent "RiView".';
 
 /// the geocoding request for [query], ranked near [lat], [lon] when known
 Uri geocodingUri(String query, {required String key, double? lat, double? lon, int limit = 6}) => Uri.https(
@@ -58,7 +59,7 @@ List<Place> parseGeocoding(String body) {
 
 /// what a refusal from MapTiler means, for the driver
 String mapTilerRefusal(int status) => switch (status) {
-      400 || 401 || 403 => 'MapTiler refused the key ($status): check it, and that it allows the User-Agent "OPRivView"',
+      400 || 401 || 403 => 'MapTiler refused the key ($status): check it, and that it allows the User-Agent "RiView"',
       429 => 'The MapTiler key is over its free limit for now (429)',
       _ => 'MapTiler answered $status',
     };

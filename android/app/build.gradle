@@ -74,4 +74,7 @@ flutter {
 dependencies {
     // FileProvider, to hand a downloaded update to Android's installer
     implementation "androidx.core:core:1.13.1"
+    // WebRTC's own classes, for Record's "Camera + drive data" (StreamCapture.kt): the same build
+    // flutter_webrtc 1.3.0 uses (its dependency is not passed on to the app)
+    implementation "io.github.webrtc-sdk:android:137.7151.04"
 }

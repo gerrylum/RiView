@@ -3,6 +3,7 @@
 import 'dart:async';
 
 import 'package:flutter/services.dart';
+import 'package:opview/services/app_settings.dart' show RecordMethod;
 
 /// a clip the head unit has finished writing
 class SavedClip {
@@ -29,9 +30,13 @@ class ClipFailedEvent extends RecorderEvent {
 class CaptureEndedEvent extends RecorderEvent {}
 
 abstract class RecorderPlatform {
-  /// ask Android for the screen if not yet allowed this launch, then keep [buffer] ready;
-  /// [crop] in physical pixels inside the app's window. False when refused
-  Future<bool> start({required Duration buffer, required Rect crop});
+  /// keep [buffer] ready. [RecordMethod.screen]: asks Android for the screen if not yet allowed
+  /// this launch; [crop] in physical pixels inside the app's window. [RecordMethod.stream]: records
+  /// the camera stream's video track [track] (no prompt). False when refused or not possible
+  Future<bool> start({required Duration buffer, required Rect crop, RecordMethod method = RecordMethod.screen, String? track});
+
+  /// the camera stream's video track changed (a reconnect, the other camera)
+  Future<void> setTrack(String track);
   Future<void> stop();
   Future<void> setBuffer(Duration buffer);
   Future<void> setCrop(Rect crop);
@@ -84,8 +89,17 @@ class MethodChannelRecorder implements RecorderPlatform {
   }
 
   @override
-  Future<bool> start({required Duration buffer, required Rect crop}) async =>
-      await _call<bool>('start', {'bufferMs': buffer.inMilliseconds, ..._rect(crop)}) ?? false;
+  Future<bool> start({required Duration buffer, required Rect crop, RecordMethod method = RecordMethod.screen, String? track}) async =>
+      await _call<bool>('start', {
+        'bufferMs': buffer.inMilliseconds,
+        ..._rect(crop),
+        'mode': method == RecordMethod.stream ? 'stream' : 'screen',
+        if (track != null) 'track': track,
+      }) ??
+      false;
+
+  @override
+  Future<void> setTrack(String track) => _call('setTrack', track);
 
   @override
   Future<void> stop() => _call('stop');

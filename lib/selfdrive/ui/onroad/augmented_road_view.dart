@@ -46,6 +46,10 @@ class AugmentedRoadView extends StatefulWidget {
   /// load map tiles for the mini map (off in tests)
   final bool mapTiles;
 
+  /// draws the video in place of the live stream, in the frame the overlay uses (the Gallery's
+  /// clip under its replayed drive data)
+  final Widget Function(FrameTransform frame)? videoOverride;
+
   const AugmentedRoadView({
     super.key,
     required this.uiState,
@@ -58,6 +62,7 @@ class AugmentedRoadView extends StatefulWidget {
     this.details = false,
     this.onOpenSettings,
     this.mapTiles = true,
+    this.videoOverride,
   });
 
   @override
@@ -199,6 +204,8 @@ class _AugmentedRoadViewState extends State<AugmentedRoadView> {
   /// video layer: the camera image zoomed and shifted exactly as the overlay is,
   /// or black placeholder
   Widget _videoLayer(FrameTransform frame) {
+    final override = widget.videoOverride;
+    if (override != null) return override(frame);
     if (widget.videoRenderer == null) {
       return Container(color: Colors.black);
     }

@@ -54,7 +54,13 @@ class _OpviewAppState extends State<OpviewApp> with WidgetsBindingObserver {
     _connectionManager = ConnectionManager(_uiState);
     _connectionManager.start();
     _settings.load();
-    _recorder = Recorder(platform: MethodChannelRecorder(), settings: _settings, uiState: _uiState);
+    _recorder = Recorder(
+      platform: MethodChannelRecorder(),
+      settings: _settings,
+      uiState: _uiState,
+      videoTrack: _connectionManager.videoTrackId,
+    );
+    _connectionManager.onChunk = _recorder.onDriveData;
     // nothing new is recorded in a picture-in-picture window (it would be the whole screen)
     pipMode.addListener(_applyForeground);
     // the camera choice in the settings goes to the connection

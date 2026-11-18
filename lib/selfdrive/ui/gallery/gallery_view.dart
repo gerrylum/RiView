@@ -56,7 +56,10 @@ class GalleryView extends StatefulWidget {
   final double unit;
   final ClipPlaybackFactory playback;
 
-  const GalleryView({super.key, required this.recorder, required this.unit, this.playback = videoPlayerPlayback});
+  /// load map tiles for a replayed overlay's mini map (off in tests)
+  final bool mapTiles;
+
+  const GalleryView({super.key, required this.recorder, required this.unit, this.playback = videoPlayerPlayback, this.mapTiles = true});
 
   @override
   State<GalleryView> createState() => _GalleryViewState();
@@ -152,6 +155,8 @@ class _GalleryViewState extends State<GalleryView> {
         clip: open,
         unit: widget.unit,
         playback: widget.playback,
+        settings: _rec.settings,
+        mapTiles: widget.mapTiles,
         onBack: () => setState(() => _open = null),
         onStar: (s) => _star(open, s),
         onShare: () => _rec.platform.share(open.video.path),

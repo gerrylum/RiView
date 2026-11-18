@@ -38,17 +38,31 @@ import java.nio.FloatBuffer
 private const val TAG = "RiViewRecord"
 
 const val MAX_CLIP_US = 5L * 60 * 1_000_000      // clips stop at 5:00
-private const val SEGMENT_US = 10L * 1_000_000   // a new segment file at the first keyframe after 10 s
-private const val MAX_WIDTH = 1280
-private const val BIT_RATE = 4_000_000
-private const val FRAME_RATE = 30
-private const val KEYFRAME_S = 2
-private const val KEEP_ALIVE_MS = 100L
+internal const val SEGMENT_US = 10L * 1_000_000   // a new segment file at the first keyframe after 10 s
+internal const val MAX_WIDTH = 1280
+internal const val BIT_RATE = 4_000_000
+internal const val FRAME_RATE = 30
+internal const val KEYFRAME_S = 2
+internal const val KEEP_ALIVE_MS = 100L
 
 /** a cropped region of the display, in physical pixels */
 data class CropRect(val x: Int, val y: Int, val w: Int, val h: Int)
 
 /** what the recorder tells the app */
+/** what Record drives: the screen (ScreenCapture) or the camera stream (StreamCapture) */
+interface Capture {
+    /** how much is kept from before a tap on Record */
+    var bufferMs: Long
+    fun start()
+    fun stop()
+    fun setCrop(rect: CropRect)
+    fun setPaused(value: Boolean, reason: String)
+    /** start a clip with what is buffered; returns how much from before now it includes (ms) */
+    fun startClip(): Long
+    fun stopClip()
+    val recording: Boolean
+}
+
 interface CaptureListener {
     /** a clip was written: the file, when it starts (wall clock ms), its length, how much came from before the tap */
     fun onClipSaved(path: String, startWallMs: Long, durationMs: Long, bufferedMs: Long)
@@ -65,7 +79,7 @@ class ScreenCapture(
     private val segmentDir: File,
     private val clipDir: File,
     private val listener: CaptureListener,
-) {
+) : Capture {
     private val glThread = HandlerThread("RiViewRecordGL").apply { start() }
     private val gl = Handler(glThread.looper)
     private var drainThread: Thread? = null
@@ -122,7 +136,7 @@ class ScreenCapture(
     private val segments = SegmentWriter(segmentDir).apply { setBuffer(bufferMs * 1000) }
 
     /** how much is kept from before a tap on Record */
-    var bufferMs: Long = bufferMs
+    override var bufferMs: Long = bufferMs
         set(value) {
             field = value
             segments.setBuffer(value * 1000)
@@ -130,7 +144,7 @@ class ScreenCapture(
     private var outW = 0
     private var outH = 0
 
-    fun start() {
+    override fun start() {
         segmentDir.mkdirs()
         segmentDir.listFiles()?.forEach { it.delete() }  // left over from a crash
         clipDir.mkdirs()
@@ -138,7 +152,7 @@ class ScreenCapture(
         gl.post { setUpOnGl() }
     }
 
-    fun stop() {
+    override fun stop() {
         running = false
         segments.abandonClip()
         gl.post {
@@ -171,12 +185,12 @@ class ScreenCapture(
         }
     }
 
-    fun setCrop(rect: CropRect) {
+    override fun setCrop(rect: CropRect) {
         gl.post { crop = clampCrop(rect) }
     }
 
     /** cover the clip with the paused card, saying [reason] ("Gallery open on the head unit"), or lift it */
-    fun setPaused(value: Boolean, reason: String) {
+    override fun setPaused(value: Boolean, reason: String) {
         gl.post {
             try {
                 if (value && (!paused || reason != pausedReason)) {
@@ -193,14 +207,14 @@ class ScreenCapture(
     }
 
     /** start a clip with what is buffered; returns how much from before now it includes (ms) */
-    fun startClip(): Long = segments.startClip(bufferMs * 1000) / 1000
+    override fun startClip(): Long = segments.startClip(bufferMs * 1000) / 1000
 
-    fun stopClip() {
+    override fun stopClip() {
         segments.requestStop()
         requestKeyframe()
     }
 
-    val recording: Boolean get() = segments.recording
+    override val recording: Boolean get() = segments.recording
 
     // -- set up --
 
@@ -639,7 +653,7 @@ private class Closed(val file: File, val firstUs: Long, val lastUs: Long)
  * the newest [bufferUs] is kept; with one, everything from its start is kept until it stops.
  * Called from the drain thread, except the clip calls (the app's thread): all under the lock.
  */
-private class SegmentWriter(private val dir: File) {
+internal class SegmentWriter(private val dir: File) {
     @Volatile var format: MediaFormat? = null
     private val lock = Object()
     private var current: Segment? = null

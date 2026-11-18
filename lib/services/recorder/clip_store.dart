@@ -1,5 +1,6 @@
 // the recorded clips on the head unit: <start ms>.mp4 with a .json beside it (length, star, what
-// happened during it) and a .jpg thumbnail, all in the app's own clips folder
+// happened during it) and a .jpg thumbnail, all in the app's own clips folder. A "Camera + drive
+// data" clip also has <start ms>.drive.gz, the comma's messages to draw the overlay from (drive_data.dart)
 
 import 'dart:convert';
 import 'dart:io';
@@ -40,6 +41,9 @@ class Clip {
   final List<DriveEvent> events;
   final int bytes;
 
+  /// the video is the camera alone, and [driveData] has what to draw over it
+  final bool hasDriveData;
+
   const Clip({
     required this.video,
     required this.start,
@@ -48,11 +52,13 @@ class Clip {
     this.starred = false,
     this.events = const [],
     this.bytes = 0,
+    this.hasDriveData = false,
   });
 
   String get id => video.uri.pathSegments.last.replaceAll('.mp4', '');
   File get meta => File(video.path.replaceAll(RegExp(r'\.mp4$'), '.json'));
   File get thumbnail => File(video.path.replaceAll(RegExp(r'\.mp4$'), '.jpg'));
+  File get driveData => driveDataFor(video);
   bool get hasAlert => events.any((e) => e.kind == DriveEventKind.alert);
 
   Clip copyWith({bool? starred}) => Clip(
@@ -63,6 +69,7 @@ class Clip {
         starred: starred ?? this.starred,
         events: events,
         bytes: bytes,
+        hasDriveData: hasDriveData,
       );
 
   Map<String, dynamic> toJson() => {
@@ -73,6 +80,9 @@ class Clip {
         'events': [for (final e in events) e.toJson()],
       };
 }
+
+/// where a clip's drive data goes
+File driveDataFor(File video) => File(video.path.replaceAll(RegExp(r'\.mp4$'), '.drive.gz'));
 
 class ClipStore {
   final Directory dir;
@@ -100,6 +110,14 @@ class ClipStore {
     } catch (_) {
       return null;
     }
+    var hasDriveData = false;
+    try {
+      final drive = driveDataFor(video);
+      if (await drive.exists()) {
+        hasDriveData = true;
+        bytes += await drive.length();
+      }
+    } catch (_) {}
     Map<String, dynamic> j = const {};
     final meta = File(video.path.replaceAll(RegExp(r'\.mp4$'), '.json'));
     try {
@@ -117,6 +135,7 @@ class ClipStore {
       starred: j['starred'] as bool? ?? false,
       events: (j['events'] as List? ?? const []).map(DriveEvent.fromJson).whereType<DriveEvent>().toList(),
       bytes: bytes,
+      hasDriveData: hasDriveData,
     );
   }
 
@@ -129,7 +148,7 @@ class ClipStore {
   }
 
   Future<void> delete(Clip clip) async {
-    for (final f in [clip.video, clip.meta, clip.thumbnail]) {
+    for (final f in [clip.video, clip.meta, clip.thumbnail, clip.driveData]) {
       try {
         if (await f.exists()) await f.delete();
       } catch (_) {}

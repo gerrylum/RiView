@@ -362,9 +362,20 @@ class _SettingsPageState extends State<SettingsPage> {
         : switch (r.state) {
             RecordState.recording => 'recording a clip',
             RecordState.buffering => 'keeping the last ${recordBufferLabel(s.recordBufferSeconds)}',
-            RecordState.off => r.declined ? 'not allowed this launch' : 'off',
+            RecordState.off => s.recordMethod == RecordMethod.stream
+                ? (st.isConnected ? 'waiting for the camera' : 'off until connected')
+                : (r.declined ? 'not allowed this launch' : 'off'),
           };
+    final stream = s.recordMethod == RecordMethod.stream;
     return _columns([
+      _cardBox('HOW CLIPS ARE RECORDED', [
+        _choices<RecordMethod>('recordMethod', RecordMethod.values, s.recordMethod,
+            (m) => m == RecordMethod.stream ? '${recordMethodLabel(m)} (beta)' : recordMethodLabel(m), s.setRecordMethod),
+      ],
+          sub: stream
+              ? 'The comma\'s camera and its drive data. No Android prompt, and pages over the camera don\'t pause '
+                  'it. The Gallery draws the overlay when a clip plays; shared clips are the camera alone'
+              : 'What\'s on screen, overlay included. Android asks each time RiView starts'),
       _cardBox('KEEP THE LAST', [
         _choices<int>('recordBuffer', recordBufferChoices, s.recordBufferSeconds, recordBufferLabel, s.setRecordBufferSeconds),
       ], sub: 'Saved with the clip when you tap Record. Off records only from the tap'),
@@ -373,7 +384,8 @@ class _SettingsPageState extends State<SettingsPage> {
       ], sub: 'Over it the oldest unstarred clips are removed; starred clips are kept'),
       _cardBox('ON THE HEAD UNIT', [
         _valueRow('Clips', clips == null ? '…' : '${clips.length} · ${formatBytes(bytes)}', key: 'recordingClips'),
-        _valueRow('Screen recording', state, color: r == null || r.state == RecordState.off ? _value : _green),
+        _valueRow(stream ? 'Camera recording' : 'Screen recording', state,
+            color: r == null || r.state == RecordState.off ? _value : _green, key: 'recordingState'),
       ]),
       _cardBox('CLIPS', [
         _valueRow('Clips stop at', formatRecordingTime(maxClipLength)),

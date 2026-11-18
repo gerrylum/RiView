@@ -7,6 +7,7 @@
 
 import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:opview/system/webrtc/webrtcd_api.dart';
 
@@ -14,6 +15,9 @@ class WebRTCClient {
   RTCPeerConnection? _pc;
   RTCDataChannel? _dataChannel;
   final RTCVideoRenderer videoRenderer = RTCVideoRenderer();
+
+  /// the id of the camera's video track while there is one (Record's "Camera + drive data")
+  final videoTrackId = ValueNotifier<String?>(null);
   int _connectGen = 0; // generation counter — stale connects bail out
 
   // data channel messages as a stream
@@ -60,6 +64,7 @@ class WebRTCClient {
     _pc!.onTrack = (event) {
       if (event.track.kind == 'video' && event.streams.isNotEmpty) {
         videoRenderer.srcObject = event.streams[0];
+        if (gen == _connectGen) videoTrackId.value = event.track.id;
       }
     };
 
@@ -125,6 +130,7 @@ class WebRTCClient {
     final dc = _dataChannel;
     _pc = null;
     _dataChannel = null;
+    videoTrackId.value = null;
     if (_initialized) videoRenderer.srcObject = null;
     dc?.close();
     await pc?.close();
@@ -134,6 +140,7 @@ class WebRTCClient {
     _connectGen++;
     await _cleanup();
     await videoRenderer.dispose();
+    videoTrackId.dispose();
     await _dataController.close();
     await _stateController.close();
   }

@@ -182,7 +182,8 @@ class _AppShellState extends State<AppShell> {
   Future<void> _startBuffer() async {
     final r = recorder;
     if (r == null || !mounted || settings.recordBufferSeconds == 0 || r.declined) return;
-    if (!await _explained()) {
+    // the explainer is about Android's screen-recording prompt; the camera stream has none
+    if (settings.recordMethod == RecordMethod.screen && !await _explained()) {
       r.declined = true;
       return;
     }
@@ -207,7 +208,7 @@ class _AppShellState extends State<AppShell> {
       return;
     }
     _show(null);  // Record shows the camera, which is what it records
-    if (!r.recording && !await _explained()) return;
+    if (!r.recording && settings.recordMethod == RecordMethod.screen && !await _explained()) return;
     await r.toggle();
     final error = r.lastError;
     if (error != null && mounted) {

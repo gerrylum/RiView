@@ -4,6 +4,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:ui';
 
+import 'package:opview/services/app_settings.dart' show RecordMethod;
 import 'package:opview/services/recorder/clip_store.dart';
 import 'package:opview/services/recorder/recorder_platform.dart';
 
@@ -23,12 +24,23 @@ class FakeRecorderPlatform implements RecorderPlatform {
   void emit(RecorderEvent e) => _events.add(e);
 
   @override
-  Future<bool> start({required Duration buffer, required Rect crop}) async {
-    calls.add('start');
+  Future<bool> start({required Duration buffer, required Rect crop, RecordMethod method = RecordMethod.screen, String? track}) async {
+    calls.add(method == RecordMethod.stream ? 'start stream $track' : 'start');
     this.buffer = buffer;
     this.crop = crop;
+    this.method = method;
+    this.track = track;
     capturing = allow;
     return allow;
+  }
+
+  RecordMethod method = RecordMethod.screen;
+  String? track;
+
+  @override
+  Future<void> setTrack(String track) async {
+    calls.add('setTrack $track');
+    this.track = track;
   }
 
   @override

@@ -218,10 +218,17 @@ class MainActivity: FlutterActivity() {
         channel.setMethodCallHandler { call, result ->
             val args = call.arguments as? Map<*, *> ?: emptyMap<Any, Any>()
             when (call.method) {
-                // ask Android for the screen (once per launch), then keep [bufferMs] ready
-                "start" -> {
+                // the camera stream's video track [track]: no prompt, no service
+                "start" -> if (args["mode"] == "stream") {
+                    startStream(args, result)
+                } else {
+                    // ask Android for the screen (once per launch), then keep [bufferMs] ready
                     CaptureHub.bufferMs = (args["bufferMs"] as? Number)?.toLong() ?: 60_000L
                     CaptureHub.crop = cropOnScreen(args)
+                    (CaptureHub.capture as? StreamCapture)?.let {
+                        it.stop()
+                        CaptureHub.capture = null
+                    }
                     val running = CaptureHub.capture
                     if (running != null) {
                         running.bufferMs = CaptureHub.bufferMs
@@ -242,7 +249,15 @@ class MainActivity: FlutterActivity() {
                     }
                 }
                 "stop" -> {
+                    (CaptureHub.capture as? StreamCapture)?.let {
+                        it.stop()
+                        CaptureHub.capture = null
+                    }
                     stopService(Intent(this, RecorderService::class.java))
+                    result.success(null)
+                }
+                "setTrack" -> {
+                    (call.arguments as? String)?.let { (CaptureHub.capture as? StreamCapture)?.setTrack(it) }
                     result.success(null)
                 }
                 "isCapturing" -> result.success(CaptureHub.capture != null)
@@ -292,6 +307,38 @@ class MainActivity: FlutterActivity() {
                 }
                 else -> result.notImplemented()
             }
+        }
+    }
+
+    private fun startStream(args: Map<*, *>, result: MethodChannel.Result) {
+        val bufferMs = (args["bufferMs"] as? Number)?.toLong() ?: 60_000L
+        val track = args["track"] as? String
+        val running = CaptureHub.capture
+        if (running is StreamCapture) {
+            running.bufferMs = bufferMs
+            track?.let { running.setTrack(it) }
+            result.success(true)
+            return
+        }
+        // a screen capture is running: it goes first
+        if (running != null) {
+            running.stop()
+            CaptureHub.capture = null
+            stopService(Intent(this, RecorderService::class.java))
+        }
+        val listener = CaptureHub.listener
+        if (track == null || listener == null) {
+            result.success(false)
+            return
+        }
+        try {
+            val c = StreamCapture(track, bufferMs, File(cacheDir, "rec_stream"), RecorderService.clipDir(this), listener)
+            c.start()
+            CaptureHub.capture = c
+            result.success(true)
+        } catch (e: Exception) {
+            android.util.Log.e("RiViewRecord", "start stream", e)
+            result.success(false)
         }
     }
 

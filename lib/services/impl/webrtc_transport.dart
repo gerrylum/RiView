@@ -2,6 +2,7 @@
 // Connects to webrtcd for video + data channel
 
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:opview/services/transport.dart';
 import 'package:opview/system/webrtc/webrtc_client.dart';
@@ -20,6 +21,9 @@ class WebRTCTransport implements Transport {
 
   @override
   dynamic get videoRenderer => _client.videoRenderer;
+
+  /// the camera's video track id while there is one
+  ValueListenable<String?> get videoTrackId => _client.videoTrackId;
 
   @override
   Future<void> connect(String host, {String camera = 'road'}) async {

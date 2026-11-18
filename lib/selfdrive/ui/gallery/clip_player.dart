@@ -1,7 +1,16 @@
 // one clip: the video (overlay burned in), a scrubber with what happened during it, and
-// Star, Share, Delete. Sizes are in the redesign mockup's pixels, scaled by `unit`
+// Star, Share, Delete. Sizes are in the redesign mockup's pixels, scaled by `unit`.
+// A "Camera + drive data" clip is the camera alone: its drive data is played into a UIState of
+// its own and the overlay drawn over the video as it plays (Overlay toggles it)
+
+import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
+import 'package:opview/common/transformations.dart' show FrameTransform;
+import 'package:opview/selfdrive/ui/onroad/augmented_road_view.dart';
+import 'package:opview/services/app_settings.dart';
+import 'package:opview/services/recorder/drive_data.dart';
 import 'package:opview/selfdrive/ui/gallery/clip_playback.dart';
 import 'package:opview/selfdrive/ui/gallery/gallery_view.dart' show formatClipDate, galleryButton;
 import 'package:opview/selfdrive/ui/shell/menu_rail.dart' show formatRecordingTime;
@@ -18,10 +27,19 @@ Color scrubColor(DriveEventKind k) => switch (k) {
       DriveEventKind.engaged => scrubEngaged,
     };
 
+typedef DriveDataLoader = Future<List<DriveLine>> Function(File file);
+
 class ClipPlayer extends StatefulWidget {
   final Clip clip;
   final double unit;
   final ClipPlaybackFactory playback;
+
+  /// the overlay's look (sections, units...) for a drive data clip
+  final AppSettings? settings;
+  final DriveDataLoader loadDriveData;
+
+  /// load map tiles for the overlay's mini map (off in tests)
+  final bool mapTiles;
   final VoidCallback onBack;
   final ValueChanged<bool> onStar;
   final VoidCallback onShare;
@@ -36,19 +54,36 @@ class ClipPlayer extends StatefulWidget {
     required this.onStar,
     required this.onShare,
     required this.onDelete,
+    this.settings,
+    this.loadDriveData = readDriveData,
+    this.mapTiles = true,
   });
 
   @override
   State<ClipPlayer> createState() => _ClipPlayerState();
 }
 
-class _ClipPlayerState extends State<ClipPlayer> {
+class _ClipPlayerState extends State<ClipPlayer> with SingleTickerProviderStateMixin {
   late ClipPlayback _p;
   String? _error;
+
+  // the drive data's overlay: on unless toggled off
+  DriveReplay? _replay;
+  bool _overlay = true;
+  late final Ticker _ticker;
+  // the player reports its position now and then; between reports it is worked out from the
+  // ticker's time ([_tickNow]) since the report came ([_reportAt])
+  Duration _reported = Duration.zero;
+  Duration _reportAt = Duration.zero;
+  Duration _tickNow = Duration.zero;
 
   @override
   void initState() {
     super.initState();
+    _ticker = createTicker((elapsed) {
+      _tickNow = elapsed;
+      _syncReplay();
+    });
     _p = widget.playback(widget.clip.video);
     _p.addListener(_changed);
     _p.init().then((_) {
@@ -56,17 +91,91 @@ class _ClipPlayerState extends State<ClipPlayer> {
     }).catchError((Object e) {
       if (mounted) setState(() => _error = 'This clip can\'t be played');
     });
+    if (widget.clip.hasDriveData) _loadDriveData();
+  }
+
+  Future<void> _loadDriveData() async {
+    try {
+      final lines = await widget.loadDriveData(widget.clip.driveData);
+      if (!mounted || lines.isEmpty) return;
+      setState(() => _replay = DriveReplay(lines, widget.clip.start)..seek(_p.position));
+      _changed();
+    } catch (e) {
+      debugPrint('[opview] drive data: $e');
+    }
   }
 
   void _changed() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    if (_p.position != _reported) {
+      _reported = _p.position;
+      _reportAt = _tickNow;
+    }
+    final run = _replay != null && _overlay && _p.playing;
+    if (run && !_ticker.isActive) {
+      _tickNow = Duration.zero;
+      _reportAt = Duration.zero;
+      _reported = _p.position;
+      _ticker.start();
+    } else if (!run && _ticker.isActive) {
+      _ticker.stop();
+    }
+    if (!run) _syncReplay();
+    setState(() {});
+  }
+
+  /// the overlay follows the video: where it is now, between the player's reports too
+  void _syncReplay() {
+    final r = _replay;
+    if (r == null || !_overlay) return;
+    var at = _p.position;
+    if (_p.playing) at = _reported + (_tickNow - _reportAt);
+    if (at > _length) at = _length;
+    r.seek(at);
   }
 
   @override
   void dispose() {
+    _ticker.dispose();
     _p.removeListener(_changed);
     _p.dispose();
     super.dispose();
+  }
+
+  /// the clip's video where the live view puts the camera, so the overlay lines up the same way
+  Widget _clipVideo(FrameTransform frame) => Stack(children: [
+        Positioned(
+          left: frame.videoLeft,
+          top: frame.videoTop,
+          width: frame.videoWidth,
+          height: frame.videoHeight,
+          child: ClipRect(
+            child: FittedBox(
+              fit: BoxFit.cover,
+              child: SizedBox(width: 1000 * _p.aspectRatio, height: 1000, child: _p.ready ? _p.view() : null),
+            ),
+          ),
+        ),
+      ]);
+
+  Widget _video() {
+    final r = _replay;
+    if (r == null || !_overlay) return _p.ready ? _p.view() : const SizedBox.shrink();
+    return ListenableBuilder(
+      listenable: r,
+      builder: (context, _) => ListenableBuilder(
+        listenable: r.state,
+        builder: (context, _) => AbsorbPointer(
+          child: AugmentedRoadView(
+            key: const ValueKey('clipOverlay'),
+            uiState: r.state,
+            settings: widget.settings,
+            mapTiles: widget.mapTiles,
+            videoOverride: _clipVideo,
+          ),
+        ),
+      ),
+    );
   }
 
   Duration get _length => _p.ready && _p.duration > Duration.zero ? _p.duration : widget.clip.duration;
@@ -99,6 +208,13 @@ class _ClipPlayerState extends State<ClipPlayer> {
               ),
             ),
             SizedBox(width: 16 * u),
+            if (_replay != null) ...[
+              galleryButton(u, _overlay ? 'Overlay' : 'Camera only', () {
+                setState(() => _overlay = !_overlay);
+                _changed();
+              }, key: const ValueKey('clipOverlayToggle'), color: _overlay ? null : const Color(0xFF9A9A9A)),
+              SizedBox(width: 12 * u),
+            ],
             galleryButton(u, clip.starred ? '★ Starred' : '☆ Star', () => widget.onStar(!clip.starred),
                 key: const ValueKey('clipStar'), color: clip.starred ? _starColor : null),
             SizedBox(width: 12 * u),
@@ -110,13 +226,14 @@ class _ClipPlayerState extends State<ClipPlayer> {
           Expanded(
             child: Center(
               child: AspectRatio(
-                aspectRatio: _p.aspectRatio,
+                // the overlay is laid out for the head unit's camera area
+                aspectRatio: _replay != null && _overlay ? 16 / 9 : _p.aspectRatio,
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(14 * u),
                   child: GestureDetector(
                     onTap: () => _p.playing ? _p.pause() : _p.play(),
                     child: Stack(fit: StackFit.expand, children: [
-                      Container(color: Colors.black, child: _p.ready ? _p.view() : null),
+                      Container(color: Colors.black, child: _video()),
                       if (_error != null)
                         Center(child: Text(_error!, style: TextStyle(color: Colors.white70, fontSize: 24 * u)))
                       else if (!_p.playing)

@@ -80,6 +80,13 @@ const _navRecentsKey = 'nav_recents';
 const _navSavedKey = 'nav_saved';
 const _storageLimitKey = 'record_storage_gb';
 const _recordExplainedKey = 'record_explained';
+const _recordMethodKey = 'record_method';
+
+/// how Record makes a clip: the screen with the overlay drawn on it (Android asks each launch), or
+/// the comma's camera stream plus the drive data, with the overlay drawn again when it plays (beta)
+enum RecordMethod { screen, stream }
+
+String recordMethodLabel(RecordMethod m) => switch (m) { RecordMethod.screen => 'Screen recording', RecordMethod.stream => 'Camera + drive data' };
 
 /// Record's "Keep the last" choices, in seconds (0: off)
 const recordBufferChoices = [0, 30, 60, 120];
@@ -135,6 +142,9 @@ class AppSettings extends ChangeNotifier {
   /// the Record explainer has been shown and accepted once
   bool recordExplained = false;
 
+  /// how clips are recorded (Settings › Recording)
+  RecordMethod recordMethod = RecordMethod.screen;
+
   /// Navigate's saved places
   Place? navHome;
   Place? navWork;
@@ -176,6 +186,7 @@ class AppSettings extends ChangeNotifier {
     final limit = prefs.getInt(_storageLimitKey);
     storageLimitGb = storageLimitChoices.contains(limit) ? limit! : 10;
     recordExplained = prefs.getBool(_recordExplainedKey) ?? false;
+    recordMethod = prefs.getString(_recordMethodKey) == RecordMethod.stream.name ? RecordMethod.stream : RecordMethod.screen;
     navHome = _place(prefs.getString(_navHomeKey));
     navWork = _place(prefs.getString(_navWorkKey));
     navRecents = (prefs.getStringList(_navRecentsKey) ?? const []).map(_place).whereType<Place>().toList();
@@ -275,6 +286,14 @@ class AppSettings extends ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(_recordBufferKey, value);
+  }
+
+  Future<void> setRecordMethod(RecordMethod value) async {
+    if (value == recordMethod) return;
+    recordMethod = value;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_recordMethodKey, value.name);
   }
 
   Future<void> setStorageLimitGb(int value) async {

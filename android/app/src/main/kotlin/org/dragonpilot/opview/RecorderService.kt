@@ -25,7 +25,8 @@ import java.io.File
 
 /** what is shared between the activity and the service (one process) */
 object CaptureHub {
-    @Volatile var capture: ScreenCapture? = null
+    /** the running capture: a ScreenCapture (held by this service) or a StreamCapture (no service) */
+    @Volatile var capture: Capture? = null
     @Volatile var listener: CaptureListener? = null
 
     /** the capture stopped without being asked (the user stopped it from Android's own controls) */
@@ -61,7 +62,7 @@ class RecorderService : Service() {
             p.registerCallback(object : MediaProjection.Callback() {
                 override fun onStop() {
                     main.post {
-                        if (CaptureHub.capture != null) {
+                        if (CaptureHub.capture is ScreenCapture) {
                             CaptureHub.capture = null
                             CaptureHub.onEnded?.invoke()
                             stopSelf()
@@ -120,8 +121,12 @@ class RecorderService : Service() {
     }
 
     override fun onDestroy() {
-        CaptureHub.capture?.stop()
-        CaptureHub.capture = null
+        // only the screen capture is this service's (a camera stream capture runs without one)
+        val c = CaptureHub.capture
+        if (c is ScreenCapture) {
+            c.stop()
+            CaptureHub.capture = null
+        }
         projection = null
         super.onDestroy()
     }

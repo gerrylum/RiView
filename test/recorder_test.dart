@@ -4,10 +4,12 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:opview/selfdrive/ui/ui_state.dart';
 import 'package:opview/services/app_settings.dart';
 import 'package:opview/services/recorder/clip_store.dart';
+import 'package:opview/services/recorder/drive_data.dart';
 import 'package:opview/services/recorder/recorder.dart';
 import 'package:opview/services/recorder/recorder_platform.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -273,6 +275,101 @@ void main() {
       expect(platform.buffer, const Duration(seconds: 30));
     });
 
+    group('camera + drive data', () {
+      late ValueNotifier<String?> track;
+      late DriveDataLog drive;
+      Recorder makeStream() => Recorder(
+            platform: platform,
+            settings: settings,
+            uiState: st,
+            clock: () => now,
+            videoTrack: track,
+            driveLog: drive,
+          );
+      setUp(() {
+        track = ValueNotifier(null);
+        drive = DriveDataLog(Directory('${dir.path}/blocks'), nowMs: () => now.millisecondsSinceEpoch, inline: true);
+        settings.recordMethod = RecordMethod.stream;
+      });
+
+      test('starts once there is a camera track, with no crop, and follows a new track', () async {
+        final r = makeStream();
+        await r.startBuffer();
+        expect(platform.calls, isEmpty);  // no track yet
+        track.value = 'v1';
+        await pumpEventQueue();
+        expect(platform.calls, ['start stream v1']);
+        expect(r.state, RecordState.buffering);
+        expect(r.recordsStream, isTrue);
+        track.value = null;
+        track.value = 'v2';
+        expect(platform.calls.last, 'setTrack v2');
+        // pages over the camera don't pause it
+        r.setCoveredBy('Settings');
+        expect(r.paused, isFalse);
+        expect(platform.paused, isFalse);
+        r.dispose();
+      });
+
+      test('Record with no camera yet says so', () async {
+        final r = makeStream();
+        await r.toggle();
+        expect(r.recording, isFalse);
+        expect(r.lastError, 'The camera is not showing yet');
+        r.dispose();
+      });
+
+      test('a saved clip gets the drive data beside it', () async {
+        track.value = 'v1';
+        final r = makeStream();
+        await r.startBuffer();
+        // 90 s of messages, 10 a second
+        for (var i = 0; i < 900; i++) {
+          r.onDriveData('{"type": "carState", "data": {"vEgo": ${i / 10}}}');
+          now = now.add(const Duration(milliseconds: 100));
+        }
+        await r.toggle();
+        final start = now.subtract(const Duration(seconds: 60));
+        final v = await _video(dir, start.millisecondsSinceEpoch);
+        platform.emit(ClipSavedEvent(SavedClip(v.path, start, const Duration(seconds: 60), const Duration(seconds: 60))));
+        await Future<void>.delayed(const Duration(milliseconds: 500));
+        final clip = (await ClipStore(dir).list()).single;
+        expect(clip.hasDriveData, isTrue);
+        final lines = await readDriveData(clip.driveData, inline: true);
+        expect(lines.where((l) => l.t >= start.millisecondsSinceEpoch - 3000).length, closeTo(630, 5));  // from 3 s before
+        r.dispose();
+      });
+
+      test('nothing is kept while screen recording', () async {
+        settings.recordMethod = RecordMethod.screen;
+        track.value = 'v1';
+        final r = makeStream()..setCrop(_crop);
+        await r.startBuffer();
+        expect(r.recordsStream, isFalse);
+        r.onDriveData('{"type": "carState", "data": {}}');
+        expect(await drive.writeClip(File('${dir.path}/x.gz'), now.subtract(const Duration(seconds: 1)), const Duration(seconds: 2)), isFalse);
+        r.dispose();
+      });
+
+      test('choosing the other method switches the capture', () async {
+        settings.recordMethod = RecordMethod.screen;
+        track.value = 'v1';
+        final r = makeStream()..setCrop(_crop);
+        await r.startBuffer();
+        expect(platform.calls, ['start']);
+        await settings.setRecordMethod(RecordMethod.stream);
+        await pumpEventQueue();
+        expect(platform.calls, ['start', 'stop', 'start stream v1']);
+        expect(r.recordsStream, isTrue);
+        // back to the screen: its first start waits for the explainer
+        await settings.setRecordMethod(RecordMethod.screen);
+        await pumpEventQueue();
+        expect(platform.calls.last, 'stop');
+        expect(r.state, RecordState.off);
+        r.dispose();
+      });
+    });
+
     test('stopped from Android\'s controls: off until Record is tapped', () async {
       final r = make()..setCrop(_crop);
       await r.startBuffer();
@@ -284,6 +381,20 @@ void main() {
   });
 
   group('settings', () {
+    test('how clips are recorded is remembered; screen recording unless chosen', () async {
+      final a = AppSettings();
+      await a.load();
+      expect(a.recordMethod, RecordMethod.screen);
+      await a.setRecordMethod(RecordMethod.stream);
+      final b = AppSettings();
+      await b.load();
+      expect(b.recordMethod, RecordMethod.stream);
+      SharedPreferences.setMockInitialValues({'record_method': 'something'});
+      final c = AppSettings();
+      await c.load();
+      expect(c.recordMethod, RecordMethod.screen);
+    });
+
     test('Keep the last and the storage limit are remembered, odd values fall back', () async {
       final a = AppSettings();
       await a.load();

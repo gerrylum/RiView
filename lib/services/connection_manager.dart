@@ -50,6 +50,15 @@ class ConnectionManager {
 
   dynamic get videoRenderer => _transport.videoRenderer;
 
+  /// the camera's video track id while connected (only with the WebRTC transport)
+  ValueListenable<String?>? get videoTrackId {
+    final t = _transport;
+    return t is WebRTCTransport ? t.videoTrackId : null;
+  }
+
+  /// each chunk from the data channel as it arrives, before it is read (Record keeps them)
+  void Function(String chunk)? onChunk;
+
   ConnectionManager(
     this._uiState, {
     Discovery? discovery,
@@ -203,6 +212,7 @@ class ConnectionManager {
         return;
       }
       if (_watchdog.onData()) _setDataStale(false);
+      onChunk?.call(chunk);
       _adapter.apply(_uiState, chunk);
       _switchStreamIfNeeded();
     });

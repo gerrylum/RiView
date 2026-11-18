@@ -7,10 +7,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:opview/selfdrive/ui/gallery/clip_playback.dart';
 import 'package:opview/selfdrive/ui/gallery/clip_player.dart';
 import 'package:opview/selfdrive/ui/gallery/gallery_view.dart';
+import 'package:opview/selfdrive/ui/onroad/augmented_road_view.dart';
 import 'package:opview/selfdrive/ui/shell/menu_rail.dart';
 import 'package:opview/selfdrive/ui/ui_state.dart';
 import 'package:opview/services/app_settings.dart';
 import 'package:opview/services/recorder/clip_store.dart';
+import 'package:opview/services/recorder/drive_data.dart';
 import 'package:opview/services/recorder/recorder.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'support/fake_recorder.dart';
@@ -226,6 +228,54 @@ void main() {
       await tester.pump();
       expect(find.byKey(const ValueKey('galleryView')), findsOneWidget);
       expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('a camera + drive data clip: the overlay drawn over the video follows it, and turns off', (tester) async {
+      _screen(tester, 1770, 916);
+      final start = DateTime(2026, 11, 18, 9);
+      final lines = [
+        for (var i = 0; i < 100; i++)
+          DriveLine(start.millisecondsSinceEpoch + i * 100, 'carState', '{"type": "carState", "data": {"vEgo": ${i / 10}}}'),
+      ];
+      final clip = Clip(video: File('/memory/1.mp4'), start: start, duration: const Duration(seconds: 10), hasDriveData: true);
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: ClipPlayer(
+            clip: clip,
+            unit: 1,
+            playback: (_) => playback,
+            settings: AppSettings(),
+            loadDriveData: (_) async => lines,
+            mapTiles: false,
+            onBack: () {},
+            onStar: (_) {},
+            onShare: () {},
+            onDelete: () {},
+          ),
+        ),
+      ));
+      await tester.pump();
+      await tester.pump();
+      final overlay = find.byKey(const ValueKey('clipOverlay'));
+      expect(overlay, findsOneWidget);
+      expect(find.byKey(const ValueKey('fakeVideo')), findsOneWidget);
+      expect(playback.playing, isTrue);
+      // the player has not said where it is yet: the overlay goes by the time since it started
+      await tester.pump(const Duration(seconds: 2));
+      await tester.pump();
+      expect(tester.widget<AugmentedRoadView>(overlay).uiState.vEgo, closeTo(2.0, 0.15));
+      // paused and scrubbed back: the overlay goes with it
+      await playback.pause();
+      await playback.seekTo(const Duration(seconds: 5));
+      await tester.pump();
+      expect(tester.widget<AugmentedRoadView>(overlay).uiState.vEgo, 5.0);
+      await tester.tap(find.byKey(const ValueKey('clipOverlayToggle')));
+      await tester.pump();
+      expect(overlay, findsNothing);
+      expect(find.text('Camera only'), findsOneWidget);
+      expect(find.byKey(const ValueKey('fakeVideo')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
     });
 
     testWidgets('lays out on the small head unit shapes', (tester) async {

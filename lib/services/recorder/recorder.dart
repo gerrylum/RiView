@@ -1,12 +1,16 @@
 // Record: keeps the last minute (or what Settings says) ready while connected, and makes a clip
 // from it and what follows when Record is tapped, stopping at 5:00
-// (design: claude/oprivview-record-gallery-design.md; the capture itself is ScreenCapture.kt)
+// (design: claude/oprivview-record-gallery-design.md; the capture itself is ScreenCapture.kt).
+// With "Camera + drive data" (claude/oprivview-telemetry-clips-design.md) the video is the comma's
+// camera stream (StreamCapture.kt, no Android prompt) and the comma's messages are kept beside it
+// (drive_data.dart), for the Gallery to draw the overlay from
 
 import 'dart:async';
 import 'dart:io';
 import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
+import 'package:opview/services/recorder/drive_data.dart';
 import 'package:opview/selfdrive/ui/ui_state.dart';
 import 'package:opview/services/app_settings.dart';
 import 'package:opview/services/recorder/clip_store.dart';
@@ -75,7 +79,16 @@ class Recorder extends ChangeNotifier {
   /// the user said Not now (or Android refused) this launch: no buffer until Record is tapped
   bool declined = false;
 
+  /// the camera stream's video track ("Camera + drive data" records it)
+  final ValueListenable<String?>? videoTrack;
+
   ClipStore? _store;
+  DriveDataLog? _log;
+  /// how the running capture records (the setting may have changed since)
+  RecordMethod _method = RecordMethod.screen;
+  RecordMethod _wantMethod;
+  /// the setting changed during a clip: switch after it
+  bool _switchPending = false;
   StreamSubscription<RecorderEvent>? _sub;
   Timer? _ticker;
   Rect? _crop;
@@ -85,16 +98,31 @@ class Recorder extends ChangeNotifier {
   bool _starting = false;
   int _bufferSeconds;
 
-  /// [store] replaces the clips folder on the head unit (tests)
-  Recorder({required this.platform, required this.settings, required this.uiState, DateTime Function()? clock, ClipStore? store})
-      : _store = store,
+  /// [store] and [driveLog] replace the folders on the head unit (tests)
+  Recorder({
+    required this.platform,
+    required this.settings,
+    required this.uiState,
+    this.videoTrack,
+    DateTime Function()? clock,
+    ClipStore? store,
+    DriveDataLog? driveLog,
+  })  : _store = store,
+        _log = driveLog,
         clock = clock ?? DateTime.now,
         log = DriveEventLog(clock: clock),
-        _bufferSeconds = settings.recordBufferSeconds {
+        _bufferSeconds = settings.recordBufferSeconds,
+        _wantMethod = settings.recordMethod {
     _sub = platform.events.listen(_onEvent);
     uiState.addListener(_onUiState);
     settings.addListener(_onSettings);
+    videoTrack?.addListener(_onTrack);
   }
+
+  bool get _stream => settings.recordMethod == RecordMethod.stream;
+
+  /// the running capture records the camera stream
+  bool get recordsStream => state != RecordState.off && _method == RecordMethod.stream;
 
   bool get recording => state == RecordState.recording;
   Duration get buffer => Duration(seconds: settings.recordBufferSeconds);
@@ -109,6 +137,19 @@ class Recorder extends ChangeNotifier {
 
   /// the rail says Saved for a few seconds after a clip
   bool get showsSaved => savedAt != null && clock().difference(savedAt!) < savedNoteFor && !recording;
+
+  Future<DriveDataLog?> _driveLog() async {
+    final l = _log;
+    if (l != null) return l;
+    final dir = await platform.clipDir();
+    if (dir == null) return null;
+    return _log = DriveDataLog(Directory('${Directory(dir).parent.path}/drive_blocks'));
+  }
+
+  /// one chunk from the comma's data channel, as it arrives (kept while recording the camera stream)
+  void onDriveData(String chunk) {
+    if (recordsStream) _log?.add(chunk);
+  }
 
   Future<ClipStore?> store() async {
     final s = _store;
@@ -147,31 +188,43 @@ class Recorder extends ChangeNotifier {
   }
 
   /// the camera area is covered (or the app is away), so the clip shows "Recording paused"
-  bool get paused => _coveredBy != null || !_foreground;
+  /// (the camera stream is recorded whatever is on the screen)
+  bool get paused => !_stream && (_coveredBy != null || !_foreground);
 
   void _applyPause() {
-    if (state == RecordState.off) return;
+    if (state == RecordState.off || _method == RecordMethod.stream) return;
     final reason = !_foreground ? 'RiView is in the background' : (_coveredBy == null ? '' : '$_coveredBy open on the head unit');
     platform.setPaused(!_foreground || _coveredBy != null, reason: reason);
   }
 
-  /// start keeping the buffer (asks Android the first time this launch); call when connected
+  /// start keeping the buffer (screen recording asks Android the first time this launch); call when connected
   Future<void> startBuffer() async {
     if (state != RecordState.off || declined || _starting || settings.recordBufferSeconds == 0) return;
-    final crop = _crop;
-    if (crop == null || !_foreground || !uiState.isConnected) return;
-    await _startCapture(crop);
+    if (!_foreground || !uiState.isConnected) return;
+    if (_stream ? videoTrack?.value == null : _crop == null) return;
+    await _startCapture();
   }
 
-  Future<bool> _startCapture(Rect crop) async {
+  Future<bool> _startCapture() async {
+    final method = settings.recordMethod;
+    final track = videoTrack?.value;
+    if (method == RecordMethod.stream && track == null) return false;
     _starting = true;
     try {
-      final ok = await platform.start(buffer: buffer, crop: crop);
+      DriveDataLog? drive;
+      if (method == RecordMethod.stream) {
+        drive = await _driveLog();
+        drive?.keep = buffer + maxClipLength + const Duration(seconds: 30);
+      }
+      final ok = await platform.start(buffer: buffer, crop: _crop ?? Rect.zero, method: method, track: track);
       if (!ok) {
-        declined = true;
+        // screen recording: the user said no to Android's prompt (a failed stream start is tried again later)
+        if (method == RecordMethod.screen) declined = true;
         notifyListeners();
         return false;
       }
+      _method = method;
+      if (drive != null) await drive.clear();
       state = RecordState.buffering;
       _applyPause();
       notifyListeners();
@@ -184,9 +237,14 @@ class Recorder extends ChangeNotifier {
   /// Record tapped: start a clip with what is buffered, or stop the one running
   Future<void> toggle() async {
     if (recording) return stopClip();
-    final crop = _crop;
-    if (crop == null || _starting) return;
-    if (state == RecordState.off && !await _startCapture(crop)) return;
+    if (_starting || (!_stream && _crop == null)) return;
+    if (state == RecordState.off && !await _startCapture()) {
+      if (_stream) {
+        lastError = videoTrack?.value == null ? 'The camera is not showing yet' : 'Could not record the camera';
+        notifyListeners();
+      }
+      return;
+    }
     final before = await platform.startClip();
     if (before == null) {
       lastError = 'Recording is not running';
@@ -216,6 +274,7 @@ class Recorder extends ChangeNotifier {
         if (recording) _clipEnded();
         notifyListeners();
       case CaptureEndedEvent():
+        if (_method == RecordMethod.stream) return;  // the screen capture's (an old one, stopped)
         state = RecordState.off;
         clipStart = null;
         declined = true;
@@ -229,12 +288,19 @@ class Recorder extends ChangeNotifier {
     savedLength = saved.duration;
     final s = await store();
     if (s != null) {
+      final video = File(saved.path);
+      var drive = false;
+      if (_method == RecordMethod.stream) {
+        final l = await _driveLog();
+        drive = l != null && await l.writeClip(driveDataFor(video), saved.start, saved.duration);
+      }
       final clip = Clip(
-        video: File(saved.path),
+        video: video,
         start: saved.start,
         duration: saved.duration,
         buffered: saved.buffered,
         events: log.between(saved.start, saved.duration),
+        hasDriveData: drive,
       );
       await s.save(clip);
       await s.enforceLimit(settings.storageLimitGb * 1024 * 1024 * 1024);
@@ -247,6 +313,37 @@ class Recorder extends ChangeNotifier {
     }
     _tick();
     notifyListeners();
+    if (_switchPending) await _switchMethod();
+  }
+
+  /// Settings › Recording chose the other method: stop the capture and start the new one
+  Future<void> _switchMethod() async {
+    if (recording) {
+      _switchPending = true;
+      return;
+    }
+    _switchPending = false;
+    if (state != RecordState.off) {
+      await platform.stop();
+      state = RecordState.off;
+      clipStart = null;
+      await _log?.clear();
+    }
+    declined = false;
+    notifyListeners();
+    // screen recording's first start goes through the explainer (app_shell.dart)
+    if (_stream || settings.recordExplained) await startBuffer();
+  }
+
+  /// the camera stream's track changed: record the new one, or start once there is one
+  void _onTrack() {
+    final id = videoTrack?.value;
+    if (id == null || !_stream) return;
+    if (recordsStream) {
+      platform.setTrack(id);
+    } else if (state == RecordState.off) {
+      startBuffer();
+    }
   }
 
   void _clipEnded() {
@@ -267,9 +364,21 @@ class Recorder extends ChangeNotifier {
     });
   }
 
-  void _onUiState() => log.observe(uiState);
+  bool _wasConnected = false;
+
+  void _onUiState() {
+    log.observe(uiState);
+    // the camera stream needs no prompt: start as soon as there is something to record
+    final connected = uiState.isConnected;
+    if (connected && !_wasConnected && _stream) startBuffer();
+    _wasConnected = connected;
+  }
 
   void _onSettings() {
+    if (settings.recordMethod != _wantMethod) {
+      _wantMethod = settings.recordMethod;
+      _switchMethod();
+    }
     final s = settings.recordBufferSeconds;
     if (s == _bufferSeconds) return;
     _bufferSeconds = s;
@@ -282,6 +391,7 @@ class Recorder extends ChangeNotifier {
       notifyListeners();
     } else {
       platform.setBuffer(buffer);
+      _log?.keep = buffer + maxClipLength + const Duration(seconds: 30);
     }
   }
 
@@ -291,6 +401,7 @@ class Recorder extends ChangeNotifier {
     _sub?.cancel();
     uiState.removeListener(_onUiState);
     settings.removeListener(_onSettings);
+    videoTrack?.removeListener(_onTrack);
     super.dispose();
   }
 }

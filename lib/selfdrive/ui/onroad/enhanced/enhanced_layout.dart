@@ -95,7 +95,7 @@ Color enhancedBorderColor(UIStatus status) {
     case UIStatus.engaged:
       return const Color(0xFF17C653);  // green
     case UIStatus.latOnly:
-      return const Color(0xFF4D9DFF);  // blue: steering only
+      return const Color(0xFF00C8C8);  // cyan: steering only
     case UIStatus.longOnly:
       return const Color(0xFF961CA8);  // purple: cruise only
   }
